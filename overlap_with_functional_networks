@@ -1,0 +1,63 @@
+import os
+import nibabel as nib
+import numpy as np
+import pandas as pd
+
+def calculate_overlap(atlas_data, atlas_labels, nii_data):
+    overlap_counts = {}
+    for label in atlas_labels:
+        atlas_mask = atlas_data == label
+        overlap = np.sum(np.logical_and(atlas_mask, nii_data))
+        overlap_counts[label] = overlap
+    return overlap_counts
+
+def process_file(file_path, functional_wmn_data, functional_gmn_data):
+    nii_img = nib.load(file_path)
+    nii_data = nii_img.get_fdata()
+
+    wmn_labels = list(range(1, 13))
+    wmn_overlap = calculate_overlap(functional_wmn_data, wmn_labels, nii_data)
+
+    gmn_labels = list(range(1, 20))
+    gmn_overlap = calculate_overlap(functional_gmn_data, gmn_labels, nii_data)
+
+    return wmn_overlap, gmn_overlap
+
+def main():
+    functional_wmn_img = nib.load('functional_WMN.nii.gz')
+    functional_gmn_img = nib.load('functional_GMN.nii.gz')
+
+    functional_wmn_data = functional_wmn_img.get_fdata()
+    functional_gmn_data = functional_gmn_img.get_fdata()
+
+    results = []
+
+    for root, dirs, files in os.walk('.'):
+        for file in files:
+            if file.endswith('.nii.gz'):
+                file_path = os.path.join(root, file)
+                print(f'Processing file: {file_path}')
+                wmn_overlap, gmn_overlap = process_file(file_path, functional_wmn_data, functional_gmn_data)
+                for label, count in wmn_overlap.items():
+                    results.append({
+                        'File': file,
+                        'Atlas': 'WMN',
+                        'Label': label,
+                        'Overlap': count
+                    })
+                for label, count in gmn_overlap.items():
+                    results.append({
+                        'File': file,
+                        'Atlas': 'GMN',
+                        'Label': label,
+                        'Overlap': count
+                    })
+
+    df = pd.DataFrame(results)
+
+    output_file = 'overlap_results.xlsx'
+    df.to_excel(output_file, index=False)
+    print(f'Results saved to {output_file}')
+
+if __name__ == '__main__':
+    main()
