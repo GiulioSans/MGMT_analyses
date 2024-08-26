@@ -1,0 +1,57 @@
+
+import os
+import nibabel as nib
+import numpy as np
+import pandas as pd
+
+def find_nii_files(directory):
+    nii_files = []
+    for subdirectory in os.listdir(directory):
+        sub_path = os.path.join(directory, subdirectory)
+        if os.path.isdir(sub_path):
+            for file in os.listdir(sub_path):
+                if file.endswith('.nii.gz'):
+                    nii_files.append(os.path.join(sub_path, file))
+    return nii_files
+
+atlas_path = 'adapted_Harvard_Oxford.nii.gz'
+atlas_img = nib.load(atlas_path)
+atlas_data = atlas_img.get_fdata()
+
+mask_files = find_nii_files(os.getcwd())
+
+data = []
+
+for mask_file in mask_files:
+    mask_img = nib.load(mask_file)
+    mask_data = mask_img.get_fdata()
+    
+    overlaps_WM = np.sum((atlas_data == 3) & (mask_data > 0))
+    overlaps_cortex = np.sum((atlas_data == 5) & (mask_data > 0))
+    overlaps_deep_GM = np.sum((atlas_data == 8) & (mask_data > 0))
+    total_mask_voxels = np.sum(mask_data > 0)
+    
+    ratio_WM = overlaps_WM / total_mask_voxels if total_mask_voxels > 0 else 0
+    ratio_cortex = overlaps_cortex / total_mask_voxels if total_mask_voxels > 0 else 0
+    ratio_deep_GM = overlaps_deep_GM / total_mask_voxels if total_mask_voxels > 0 else 0
+    
+    data.append([
+        os.path.basename(mask_file),
+        overlaps_WM,
+        overlaps_cortex,
+        overlaps_deep_GM,
+        ratio_WM,
+        ratio_cortex,
+        ratio_deep_GM
+    ])
+
+df = pd.DataFrame(data, columns=[
+    'Mask Name', 'Overlap with WM', 'Overlap with Cortex', 'Overlap with Deep GM',
+    'Ratio with WM', 'Ratio with Cortex', 'Ratio with Deep GM'
+])
+
+# Save to Excel
+excel_path = os.path.join(os.getcwd(), 'overlap_results_NEWEST_LAST_DEF.xlsx')
+df.to_excel(excel_path, index=False)
+
+print("Excel file created:", excel_path)
